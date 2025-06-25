@@ -15,7 +15,8 @@ global_cell_size = -1
 # --- Nova Variável para Velocidade de Clique ---
 # Ajuste este valor para controlar a velocidade do bot.
 # Valores menores = cliques mais rápidos; Valores maiores = cliques mais lentos.
-CLICK_DELAY_SECONDS = 0.0 # Exemplo: 0.05 segundos de atraso entre cliques
+# Para o mais rápido possível, tente 0.0001 ou 0.001.
+CLICK_DELAY_SECONDS = 0.0001 # OTIMIZADO PARA VELOCIDADE MÁXIMA
 
 # --- Caminho dinâmico para o Sprite Sheet ---
 SCRIPT_DIR = os.path.dirname(os.path.realpath(__file__))
@@ -120,7 +121,7 @@ def screenshot_game_window():
     try:
         windows = pyautogui.getWindowsWithTitle(MINESWEEPER_WINDOW_TITLE)
         if not windows:
-            print(f"AVISO: Janela com o título '{MINESWEEPER_WINDOW_TITLE}' não encontrada.")
+            print(f"AVISO: Janela com o título '{MINESWHEEPER_WINDOW_TITLE}' não encontrada.")
             return None, (0, 0, 0, 0)
         
         window = windows[0]
@@ -388,26 +389,6 @@ def calibrate_templates():
 
     return True
 
-def restart_game(image, window_x, window_y):
-    """Reinicia o jogo clicando na face feliz ou na face morta/vencedora. (Mantido para referência, não será chamado no fluxo principal)"""
-    face_to_click = None
-    for face_name in ["face_happy", "face_dead", "face_win"]:
-        face_template = get_calibrated_template(face_name)
-        if face_template is not None:
-            matches = find_template_matches(image, face_template, 0.8)
-            if matches:
-                face_to_click = matches[0]
-                break
-    
-    if face_to_click:
-        x, y, w, h = face_to_click
-        click_center(x, y, w, h, window_x, window_y, "left")
-        print("🔄 Jogo reiniciado")
-        return True
-    
-    print("AVISO: Não foi possível encontrar a face para reiniciar o jogo.")
-    return False
-
 # --- LOOP PRINCIPAL ---
 def main():
     global global_tabuleiro_offset_x, global_tabuleiro_offset_y, global_cell_size, CALIBRATED_TEMPLATES
@@ -419,7 +400,8 @@ def main():
         return
 
     print("🤖 Bot Campo Minado iniciando...")
-    time.sleep(2)
+    time.sleep(0.1) # Reduzido
+
     
     if not os.path.exists(os.path.join(CALIBRATED_TEMPLATES_DIR, "closed.png")):
         if not calibrate_templates():
@@ -432,6 +414,8 @@ def main():
             global_cell_size = closed_template.shape[0]
             print(f"Tamanho da célula carregado da calibração anterior: {global_cell_size}x{global_cell_size}")
         else:
+             # Caso o arquivo calibrated_templates/closed.png esteja corrompido, tenta recalibrar
+             print("AVISO: Template 'closed.png' corrompido ou inválido. Tentando recalibrar.")
              if not calibrate_templates():
                 print("❌ Falha ao tentar recalibrar. Encerrando.")
                 return
@@ -442,7 +426,7 @@ def main():
         try:
             image, window_bbox = screenshot_game_window()
             if image is None:
-                time.sleep(2)
+                time.sleep(0.1) # Reduzido, mas mantido para evitar loop em caso de janela não encontrada
                 continue
             
             window_x, window_y, _, _ = window_bbox
@@ -461,27 +445,39 @@ def main():
             
             board = build_board(image)
             if not board:
+                # Sem um board válido, a única chance é que seja o primeiro movimento ou um erro de detecção
+                # Aumentamos um pouco o atraso aqui para dar tempo para a janela do jogo carregar completamente
+                # antes de tentar novamente, mas ainda rápido.
                 print("⚠️ Não foi possível construir o tabuleiro. Tentando novamente...")
-                time.sleep(1)
+                time.sleep(0.05) # Reduzido
                 continue
             
             if not first_move_made:
                 if make_first_move(board, window_x, window_y):
                     first_move_made = True
-                    time.sleep(CLICK_DELAY_SECONDS * 10) # Pausa um pouco mais após o primeiro clique para o tabuleiro se revelar
+                    # A pausa após o primeiro clique é crucial para o jogo reagir e revelar o tabuleiro inicial.
+                    # Mantenha um pequeno atraso aqui, talvez um pouco mais que o CLICK_DELAY_SECONDS básico.
+                    time.sleep(CLICK_DELAY_SECONDS * 5) # Ajuste para permitir que o tabuleiro se revele
                 continue
             
             board, made_deterministic_move = solve_deterministic(board, window_x, window_y)
             
             if made_deterministic_move:
-                time.sleep(CLICK_DELAY_SECONDS * 5) # Pequena pausa após um movimento seguro
+                # Não há necessidade de sleep extra aqui, a próxima iteração do loop fará um novo screenshot imediatamente.
                 continue
             
-            if not make_random_move(board, window_x, window_y):
-                print("✅ Não há mais células fechadas. O jogo deveria ter terminado (ou está preso).")
-                time.sleep(3) # Espera um pouco antes de verificar novamente, caso o jogo esteja apenas lento
+            # Se não houve movimento determinístico
+            closed_cells_remaining = sum(1 for row_data in board.values() for cell in row_data.values() if cell["type"] == "closed")
+            if closed_cells_remaining == 0:
+                print("✅ Não há mais células fechadas. O jogo deveria ter terminado.")
+                # Pausa para o usuário ver o fim do jogo, se o bot não o detectar imediatamente.
+                # Para velocidade máxima, pode ser 0, mas se o jogo não terminar em 100% dos casos, é bom para depurar.
+                time.sleep(0.1) 
+                # Não break, pois o loop principal vai verificar is_game_over novamente e vai parar se for win/lose
             else:
-                time.sleep(CLICK_DELAY_SECONDS * 5) # Pausa após um movimento aleatório
+                # Se não há movimentos determinísticos e ainda há células fechadas, faz um movimento aleatório
+                # Sem sleep extra aqui, a próxima iteração do loop fará um novo screenshot imediatamente.
+                make_random_move(board, window_x, window_y)
 
         except KeyboardInterrupt:
             print("\n🛑 Bot interrompido pelo usuário.")
