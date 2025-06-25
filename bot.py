@@ -12,8 +12,12 @@ global_tabuleiro_offset_x = -1
 global_tabuleiro_offset_y = -1
 global_cell_size = -1
 
-# --- CORREÇÃO: Caminho dinâmico para o Sprite Sheet ---
-# Isso torna o script portátil. Ele vai procurar a pasta 'tiles' no mesmo diretório do bot.py
+# --- Nova Variável para Velocidade de Clique ---
+# Ajuste este valor para controlar a velocidade do bot.
+# Valores menores = cliques mais rápidos; Valores maiores = cliques mais lentos.
+CLICK_DELAY_SECONDS = 0.0 # Exemplo: 0.05 segundos de atraso entre cliques
+
+# --- Caminho dinâmico para o Sprite Sheet ---
 SCRIPT_DIR = os.path.dirname(os.path.realpath(__file__))
 SPRITE_SHEET_PATH = os.path.join(SCRIPT_DIR, "tiles", "cloneskin.png")
 SPRITE_SHEET = None
@@ -21,7 +25,7 @@ SPRITE_SHEET = None
 # Título da janela (Verifique se o título da sua janela é exatamente este)
 MINESWEEPER_WINDOW_TITLE = "Minesweeper"
 
-# --- CORREÇÃO: Coordenadas corrigidas para o seu sprite sheet 'cloneskin.png' ---
+# --- Coordenadas corrigidas para o seu sprite sheet 'cloneskin.png' ---
 TILE_MAP_COORDS_ORIGINAL = {
     # Números de 1-8
     "1": (16, 0, 16, 16),
@@ -31,26 +35,22 @@ TILE_MAP_COORDS_ORIGINAL = {
     "5": (80, 0, 16, 16),
     "6": (96, 0, 16, 16),
     "7": (112, 0, 16, 16),
-    "8": (128, 0, 16, 16), # Embora a imagem não tenha um '8' claro, mantemos a posição esperada
+    "8": (128, 0, 16, 16), 
     
     # Estados das células
     "empty_zero_revealed": (0, 0, 16, 16),
     "closed": (0, 16, 16, 16),
     
-    # --- AVISO CRÍTICO: O template para 'flag' NÃO EXISTE na sua imagem 'cloneskin.png' ---
-    # A coordenada (32, 16) na sua imagem é um "1 com fundo vermelho", não uma bandeira.
-    # O bot NÃO CONSEGUIRÁ marcar bandeiras. A lógica de bandeiras foi desativada.
-    # Para funcionar, você precisa de um sprite sheet com a imagem da bandeira.
-    # "flag": (32, 16, 16, 16), # Esta linha está desativada intencionalmente.
+    "flag": (48, 16, 16, 16), 
     
     "mine_unrevealed": (16, 16, 16, 16),
     "mine_red_exploded": (64, 16, 16, 16),
-    "wrong_flag": (48, 16, 16, 16),
+    "one_red_background": (32, 16, 16, 16), 
     "question_mark": (80, 16, 16, 16),
 }
 
 FACE_MAP_COORDS_ORIGINAL = {
-    "face_happy":         (0, 55, 25, 25), # Já está em x=0, não pode ir mais para a esquerda
+    "face_happy":         (0, 55, 25, 25),
     "face_mouth_open":    (27, 55, 25, 25),
     "face_dead":          (54, 55, 25, 25),
     "face_win":           (81, 55, 25, 25),
@@ -83,8 +83,7 @@ def extract_template_from_sprite(tile_name):
     elif tile_name in FACE_MAP_COORDS_ORIGINAL:
         x, y, w, h = FACE_MAP_COORDS_ORIGINAL[tile_name]
     else:
-        # Retorna None em vez de erro para lidar com o caso da bandeira ausente
-        return None
+        return None # Retorna None se o nome do tile não for encontrado
     
     return SPRITE_SHEET[y:y+h, x:x+w]
 
@@ -97,7 +96,7 @@ def get_calibrated_template(tile_name):
             template = cv2.imread(template_path)
         elif global_cell_size > 0:
             original = extract_template_from_sprite(tile_name)
-            if original is None: # Se o template não existe no sprite map
+            if original is None:
                 CALIBRATED_TEMPLATES[tile_name] = None
                 return None
             
@@ -110,7 +109,6 @@ def get_calibrated_template(tile_name):
             os.makedirs(CALIBRATED_TEMPLATES_DIR, exist_ok=True)
             cv2.imwrite(template_path, template)
         else:
-            # Tenta carregar do sprite sheet original se a calibração ainda não ocorreu
             template = extract_template_from_sprite(tile_name)
 
         CALIBRATED_TEMPLATES[tile_name] = template
@@ -126,11 +124,6 @@ def screenshot_game_window():
             return None, (0, 0, 0, 0)
         
         window = windows[0]
-        # Ativar a janela pode não ser necessário e pode atrapalhar
-        # if not window.isActive:
-        #     window.activate()
-        #     time.sleep(0.1)
-        
         region = (window.left, window.top, window.width, window.height)
         screenshot = pyautogui.screenshot(region=region)
         
@@ -174,21 +167,21 @@ def click_center(x, y, w, h, window_x=0, window_y=0, button='left'):
     center_x = window_x + x + w // 2
     center_y = window_y + y + h // 2
     
-    pyautogui.moveTo(center_x, center_y, duration=0.1)
+    pyautogui.moveTo(center_x, center_y, duration=0.01) # Movimento mais rápido
     pyautogui.click(button=button)
-    time.sleep(0.05)
+    time.sleep(CLICK_DELAY_SECONDS) # Usa a nova variável de atraso
 
 def is_game_over(image):
-    """Verifica se o jogo terminou."""
+    """Verifica se o jogo terminou e qual o resultado."""
     face_dead = get_calibrated_template("face_dead")
     face_win = get_calibrated_template("face_win")
     
-    if face_dead is not None and len(find_template_matches(image, face_dead, 0.85)) > 0:
-        return True
-    if face_win is not None and len(find_template_matches(image, face_win, 0.85)) > 0:
-        return True
+    if face_dead is not None and len(find_template_matches(image, face_dead, 0.95)) > 0:
+        return "lose"
+    if face_win is not None and len(find_template_matches(image, face_win, 0.95)) > 0:
+        return "win"
         
-    return False
+    return "playing" # Jogo em andamento
 
 def build_board(image):
     """Constrói o tabuleiro a partir da imagem."""
@@ -199,9 +192,10 @@ def build_board(image):
         "3": {"threshold": 0.8}, "4": {"threshold": 0.8},
         "5": {"threshold": 0.8}, "6": {"threshold": 0.8},
         "7": {"threshold": 0.8}, "8": {"threshold": 0.8},
-        "closed": {"threshold": 0.85},
-        "empty_zero_revealed": {"threshold": 0.8},
-        # A detecção de 'flag' foi removida pois o template não existe
+        "closed": {"threshold": 0.85}, 
+        "empty_zero_revealed": {"threshold": 0.9}, 
+        "flag": {"threshold": 0.85}, 
+        "one_red_background": {"threshold": 0.8} 
     }
     
     all_cells = []
@@ -222,7 +216,6 @@ def build_board(image):
         closed_cells = [c for c in all_cells if c[4] == "closed"]
         if closed_cells:
             x, y, w, h, _ = closed_cells[0]
-            # Uma pequena margem para garantir que peguemos a célula inteira
             global_tabuleiro_offset_x = x 
             global_tabuleiro_offset_y = y
             global_cell_size = w
@@ -237,7 +230,8 @@ def build_board(image):
         
         priority = {
             "1": 9, "2": 9, "3": 9, "4": 9, "5": 9, "6": 9, "7": 9, "8": 9,
-            "empty_zero_revealed": 5, "closed": 1
+            "empty_zero_revealed": 5, "flag": 7, "closed": 1, 
+            "one_red_background": 6 
         }
         
         cell_data = {
@@ -274,27 +268,42 @@ def solve_deterministic(board, window_x, window_y):
             if cell["type"].isdigit():
                 numbered_cells.append((row, col, cell))
     
-    # Regra 1: Marcar minas (DESATIVADA PELA FALTA DO SPRITE DE BANDEIRA)
-    # Sem conseguir identificar bandeiras, esta regra não pode ser usada.
-    
+    # Regra 1: Marcar minas
+    for row, col, cell in numbered_cells:
+        number = int(cell["type"])
+        neighbors = get_neighbors(board, row, col)
+        
+        closed_neighbors = [n for n in neighbors if n[2]["type"] == "closed"]
+        flagged_neighbors = [n for n in neighbors if n[2]["type"] == "flag"]
+        
+        # Se o número de células fechadas restantes for igual ao número de minas a serem marcadas
+        if len(closed_neighbors) == (number - len(flagged_neighbors)) and len(closed_neighbors) > 0:
+            for nr, nc, ncell in closed_neighbors:
+                if board[nr][nc]["type"] == "closed": 
+                    click_center(ncell["x"], ncell["y"], ncell["w"], ncell["h"], 
+                               window_x, window_y, "right") 
+                    print(f"🚩 Marcado ({nr}, {nc}) como mina")
+                    board[nr][nc]["type"] = "flag" 
+                    made_move = True
+                    return board, True 
+
     # Regra 2: Revelar células seguras
     for row, col, cell in numbered_cells:
         number = int(cell["type"])
         neighbors = get_neighbors(board, row, col)
         
         closed_neighbors = [n for n in neighbors if n[2]["type"] == "closed"]
-        flagged_neighbors = [n for n in neighbors if n[2]["type"] == "flag"] # Sempre será 0
+        flagged_neighbors = [n for n in neighbors if n[2]["type"] == "flag"]
         
-        # Clica em células seguras se todas as minas ao redor já estiverem marcadas
-        # Como não marcamos, essa regra só funcionará para a borda da área revelada
+        # Se o número de bandeiras vizinhas for igual ao número da célula, 
+        # as células fechadas restantes são seguras.
         if len(flagged_neighbors) == number and len(closed_neighbors) > 0:
             for nr, nc, ncell in closed_neighbors:
                 click_center(ncell["x"], ncell["y"], ncell["w"], ncell["h"], 
                            window_x, window_y, "left")
                 print(f"✅ Revelado ({nr}, {nc}) por lógica determinística")
-                # Não atualizamos o estado do tabuleiro aqui, vamos ler da tela novamente
-            made_move = True
-            return board, True # Retorna após a primeira ação para reavaliar o tabuleiro
+                made_move = True
+                return board, True 
     
     return board, made_move
 
@@ -343,7 +352,6 @@ def calibrate_templates():
     
     load_sprite_sheet()
     
-    # Limpa templates antigos para forçar a recalibração
     if os.path.exists(CALIBRATED_TEMPLATES_DIR):
         import shutil
         shutil.rmtree(CALIBRATED_TEMPLATES_DIR)
@@ -361,7 +369,6 @@ def calibrate_templates():
         print("Template 'closed' não encontrado no sprite sheet.")
         return False
 
-    # Tenta encontrar com um threshold mais baixo para a calibração inicial
     matches = find_template_matches(image, original_closed, 0.7)
     
     if not matches:
@@ -375,7 +382,6 @@ def calibrate_templates():
     cv2.imwrite(os.path.join(CALIBRATED_TEMPLATES_DIR, "closed.png"), calibrated_closed)
     
     print(f"Templates calibrados! Tamanho da célula detectado: {global_cell_size}x{global_cell_size}")
-    # Pré-gera todos os outros templates com o novo tamanho
     all_templates = list(TILE_MAP_COORDS_ORIGINAL.keys()) + list(FACE_MAP_COORDS_ORIGINAL.keys())
     for name in all_templates:
         get_calibrated_template(name)
@@ -383,7 +389,7 @@ def calibrate_templates():
     return True
 
 def restart_game(image, window_x, window_y):
-    """Reinicia o jogo clicando na face feliz ou na face morta/vencedora."""
+    """Reinicia o jogo clicando na face feliz ou na face morta/vencedora. (Mantido para referência, não será chamado no fluxo principal)"""
     face_to_click = None
     for face_name in ["face_happy", "face_dead", "face_win"]:
         face_template = get_calibrated_template(face_name)
@@ -420,7 +426,7 @@ def main():
             print("❌ Falha na calibração inicial. Encerrando.")
             return
     else:
-        # Carrega o tamanho da célula a partir do template já calibrado
+        # Se os templates já existem, não recalibra, apenas carrega o tamanho da célula
         closed_template = cv2.imread(os.path.join(CALIBRATED_TEMPLATES_DIR, "closed.png"))
         if closed_template is not None:
             global_cell_size = closed_template.shape[0]
@@ -441,18 +447,17 @@ def main():
             
             window_x, window_y, _, _ = window_bbox
             
-            if is_game_over(image):
-                print("🏁 Jogo terminou!")
-                time.sleep(1) # Pausa para ver o resultado
-                restart_game(image, window_x, window_y)
-                
-                # Reseta o estado do bot para o novo jogo
-                first_move_made = False
-                global_tabuleiro_offset_x = -1
-                global_tabuleiro_offset_y = -1
-                board = {}
-                time.sleep(1.5) # Espera a animação de reinício
-                continue
+            game_status = is_game_over(image)
+            if game_status == "win":
+                print("🎉🎉🎉 JOGO VENCIDO! 🎉🎉🎉")
+                print("Bot encerrado após a vitória.")
+                break # Encerra o loop e o bot
+            elif game_status == "lose":
+                print("💀 JOGO PERDIDO! 💀")
+                print("Bot encerrado após a derrota.")
+                break # Encerra o loop e o bot
+            
+            # Se o jogo não terminou (game_status == "playing"), continua o fluxo
             
             board = build_board(image)
             if not board:
@@ -463,21 +468,20 @@ def main():
             if not first_move_made:
                 if make_first_move(board, window_x, window_y):
                     first_move_made = True
-                    time.sleep(0.5) # Espera o tabuleiro abrir após o primeiro clique
+                    time.sleep(CLICK_DELAY_SECONDS * 10) # Pausa um pouco mais após o primeiro clique para o tabuleiro se revelar
                 continue
             
             board, made_deterministic_move = solve_deterministic(board, window_x, window_y)
             
             if made_deterministic_move:
-                time.sleep(0.4) # Pequena pausa após um movimento seguro
+                time.sleep(CLICK_DELAY_SECONDS * 5) # Pequena pausa após um movimento seguro
                 continue
             
-            # Se não há mais jogadas seguras, faz um movimento aleatório
             if not make_random_move(board, window_x, window_y):
-                print("✅ Não há mais células fechadas. O jogo deveria ter terminado.")
-                time.sleep(3)
+                print("✅ Não há mais células fechadas. O jogo deveria ter terminado (ou está preso).")
+                time.sleep(3) # Espera um pouco antes de verificar novamente, caso o jogo esteja apenas lento
             else:
-                time.sleep(0.5) # Pausa após um movimento aleatório
+                time.sleep(CLICK_DELAY_SECONDS * 5) # Pausa após um movimento aleatório
 
         except KeyboardInterrupt:
             print("\n🛑 Bot interrompido pelo usuário.")
