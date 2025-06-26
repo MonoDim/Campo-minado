@@ -1,6 +1,6 @@
 # Bot Inteligente para Campo Minado
 
-![Minesweeper Logo]([https://raw.githubusercontent.com/sanches-programador/Bot-Campo-Minado/main/tiles/cloneskin.png](https://github.com/MonoDim/Campo-minado/blob/main/tiles/cloneskin.png))
+![Minesweeper Logo]([https://github.com/MonoDim/Campo-minado/blob/main/tiles/cloneskin.png])
 
 ## 📖 Descrição
 
