@@ -1,6 +1,6 @@
 # Bot Inteligente para Campo Minado
 
-![Minesweeper Logo]([https://github.com/MonoDim/Campo-minado/blob/main/tiles/cloneskin.png])
+![Minesweeper Logo](https://raw.githubusercontent.com/MonoDim/Bot-Campo-Minado/main/tiles/cloneskin.png)
 
 ## 📖 Descrição
 
@@ -32,5 +32,5 @@ Siga os passos abaixo para colocar o bot em funcionamento.
 
 **1. Clone o Repositório:**
 ```bash
-git clone [https://github.com/SEU_USUARIO/SEU_REPOSITORIO.git](https://github.com/SEU_USUARIO/SEU_REPOSITORIO.git)
-cd SEU_REPOSITORIO
+git clone [https://github.com/MonoDim/Bot-Campo-Minado.git](https://github.com/MonoDim/Bot-Campo-Minado.git)
+cd Bot-Campo-Minado
